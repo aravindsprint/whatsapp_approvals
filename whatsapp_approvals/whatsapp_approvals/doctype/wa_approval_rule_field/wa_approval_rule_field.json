@@ -1,0 +1,16 @@
+{
+ "actions":[],"creation":"2024-01-01 00:00:00","doctype":"DocType","engine":"InnoDB",
+ "field_order":["label","fieldname","fieldtype"],
+ "fields":[
+  {"fieldname":"label","fieldtype":"Data","label":"Label","reqd":1,"in_list_view":1,
+   "description":"Heading shown in the WA message. E.g. Customer, Grand Total"},
+  {"fieldname":"fieldname","fieldtype":"Data","label":"Field Name","reqd":1,"in_list_view":1,
+   "description":"API fieldname from the DocType. E.g. customer_name, grand_total, items"},
+  {"fieldname":"fieldtype","fieldtype":"Select","label":"Field Type","in_list_view":1,
+   "options":"\nData\nLink\nCurrency\nFloat\nInt\nDate\nDatetime\nSmall Text\nText\nCheck\nTable",
+   "description":"For formatting. Choose Table for child table fields (e.g. items)."}
+ ],
+ "istable":1,"modified":"2024-01-01 00:00:00","modified_by":"Administrator",
+ "module":"WhatsApp Approvals","name":"WA Approval Rule Field","owner":"Administrator",
+ "permissions":[],"sort_field":"modified","sort_order":"DESC"
+}

@@ -1,0 +1,92 @@
+{
+ "actions": [],
+ "autoname": "field:rule_name",
+ "creation": "2024-01-01 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "rule_name","is_active","col_header",
+  "document_type","trigger_event","condition",
+  "message_section","message_title","fields_to_display",
+  "approver_section","approver_source","col_approver",
+  "approver_phone","approver_phone_field","approver_role"
+ ],
+ "fields": [
+  {
+   "fieldname":"rule_name","fieldtype":"Data","label":"Rule Name",
+   "reqd":1,"unique":1,"in_list_view":1,"bold":1,
+   "description":"Unique name. E.g. Sales Invoice Approval"
+  },
+  {
+   "fieldname":"is_active","fieldtype":"Check","label":"Active",
+   "default":"1","in_list_view":1,"bold":1
+  },
+  {"fieldname":"col_header","fieldtype":"Column Break"},
+  {
+   "fieldname":"document_type","fieldtype":"Link","label":"DocType",
+   "options":"DocType","reqd":1,"in_list_view":1,
+   "description":"Which DocType to watch. E.g. Sales Invoice, Purchase Order, Delivery Note"
+  },
+  {
+   "fieldname":"trigger_event","fieldtype":"Select","label":"Trigger Event",
+   "options":"before_submit\non_save\non_submit\non_update_after_submit",
+   "default":"before_submit","reqd":1,"in_list_view":1,
+   "description":"before_submit — BLOCKS submission until approved via WhatsApp (recommended).\non_save — sends message on save, for Frappe Workflow pattern.\non_submit — notification only, document is already submitted.\non_update_after_submit — fires on save of a submitted document."
+  },
+  {
+   "fieldname":"condition","fieldtype":"Code","options":"Python",
+   "label":"Condition (optional)",
+   "description":"Python expression against `doc`. Leave blank to always trigger.\nExamples:\n  doc.grand_total > 100000\n  doc.customer == 'ABC Corp'\n  doc.workflow_state == 'Pending Approval'"
+  },
+  {"fieldname":"message_section","fieldtype":"Section Break","label":"Message Content"},
+  {
+   "fieldname":"message_title","fieldtype":"Data","label":"Message Title",
+   "description":"Heading at the top of the WhatsApp message."
+  },
+  {
+   "fieldname":"fields_to_display","fieldtype":"Table",
+   "label":"Fields to Display","options":"WA Approval Rule Field",
+   "description":"Fields from the document to show in the message body."
+  },
+  {"fieldname":"approver_section","fieldtype":"Section Break","label":"Approver"},
+  {
+   "fieldname":"approver_source","fieldtype":"Select","label":"Approver Source",
+   "options":"Fixed Number\nField on Document\nRole",
+   "default":"Fixed Number","reqd":1,
+   "description":"Fixed Number — static phone on this rule.\nField on Document — reads a phone field from the document.\nRole — finds the first active User with that Role."
+  },
+  {"fieldname":"col_approver","fieldtype":"Column Break"},
+  {
+   "fieldname":"approver_phone","fieldtype":"Data","label":"Approver Phone",
+   "depends_on":"eval:doc.approver_source=='Fixed Number'",
+   "mandatory_depends_on":"eval:doc.approver_source=='Fixed Number'",
+   "description":"Digits only with country code. E.g. 919876543210"
+  },
+  {
+   "fieldname":"approver_phone_field","fieldtype":"Data","label":"Phone Field on Document",
+   "depends_on":"eval:doc.approver_source=='Field on Document'",
+   "mandatory_depends_on":"eval:doc.approver_source=='Field on Document'",
+   "description":"Fieldname on the DocType that holds the approver phone."
+  },
+  {
+   "fieldname":"approver_role","fieldtype":"Link","label":"Approver Role","options":"Role",
+   "depends_on":"eval:doc.approver_source=='Role'",
+   "mandatory_depends_on":"eval:doc.approver_source=='Role'",
+   "description":"First active User with this Role and a mobile_no will receive the message."
+  }
+ ],
+ "modified":"2024-01-01 00:00:00",
+ "modified_by":"Administrator",
+ "module":"WhatsApp Approvals",
+ "name":"WA Approval Rule",
+ "owner":"Administrator",
+ "permissions":[
+  {"create":1,"delete":1,"email":1,"export":1,"print":1,"read":1,
+   "role":"System Manager","share":1,"write":1},
+  {"read":1,"write":1,"role":"Accounts Manager"}
+ ],
+ "sort_field":"modified",
+ "sort_order":"DESC",
+ "track_changes":1,
+ "title_field":"rule_name"
+}

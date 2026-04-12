@@ -1,0 +1,46 @@
+{
+ "actions":[],"autoname":"WA-LOG-.YYYY.-.#####","creation":"2024-01-01 00:00:00",
+ "doctype":"DocType","engine":"InnoDB",
+ "field_order":["reference_section","reference_doctype","reference_name","rule_name",
+  "col1","status","reminder_count","message_section","wa_message_id","approver_phone",
+  "sent_at","col2","responded_at","response_payload","notes_section","notes"],
+ "fields":[
+  {"fieldname":"reference_section","fieldtype":"Section Break","label":"Reference"},
+  {"fieldname":"reference_doctype","fieldtype":"Link","label":"Reference DocType",
+   "options":"DocType","reqd":1,"in_list_view":1},
+  {"fieldname":"reference_name","fieldtype":"Dynamic Link","label":"Reference Name",
+   "options":"reference_doctype","reqd":1,"in_list_view":1,"bold":1},
+  {"fieldname":"rule_name","fieldtype":"Link","label":"Rule",
+   "options":"WA Approval Rule","in_list_view":1},
+  {"fieldname":"col1","fieldtype":"Column Break"},
+  {"fieldname":"status","fieldtype":"Select","label":"Status",
+   "options":"Pending\nApproved\nRejected\nFailed\nExpired",
+   "default":"Pending","reqd":1,"in_list_view":1,"bold":1},
+  {"fieldname":"reminder_count","fieldtype":"Int","label":"Reminders Sent",
+   "default":"0","read_only":1},
+  {"fieldname":"message_section","fieldtype":"Section Break","label":"Message Details"},
+  {"fieldname":"wa_message_id","fieldtype":"Data","label":"WhatsApp Message ID","read_only":1},
+  {"fieldname":"approver_phone","fieldtype":"Data","label":"Sent To","read_only":1},
+  {"fieldname":"sent_at","fieldtype":"Datetime","label":"Sent At","read_only":1},
+  {"fieldname":"col2","fieldtype":"Column Break"},
+  {"fieldname":"responded_at","fieldtype":"Datetime","label":"Responded At","read_only":1},
+  {"fieldname":"response_payload","fieldtype":"Long Text","label":"Raw Webhook Payload","read_only":1},
+  {"fieldname":"notes_section","fieldtype":"Section Break","label":"Notes"},
+  {"fieldname":"notes","fieldtype":"Small Text","label":"Notes"}
+ ],
+ "modified":"2024-01-01 00:00:00","modified_by":"Administrator",
+ "module":"WhatsApp Approvals","name":"WhatsApp Approval Log","owner":"Administrator",
+ "permissions":[
+  {"create":1,"delete":0,"email":1,"export":1,"print":1,"read":1,
+   "role":"System Manager","share":1,"write":1},
+  {"read":1,"role":"Accounts Manager"},
+  {"read":1,"role":"Purchase Manager"}
+ ],
+ "sort_field":"creation","sort_order":"DESC",
+ "states":[
+  {"color":"Orange","title":"Pending"},{"color":"Green","title":"Approved"},
+  {"color":"Red","title":"Rejected"},{"color":"Grey","title":"Failed"},
+  {"color":"Grey","title":"Expired"}
+ ],
+ "track_changes":1
+}
