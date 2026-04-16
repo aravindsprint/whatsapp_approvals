@@ -42,6 +42,7 @@ class WaApprovalRule(Document):
 def _ensure_custom_fields(doctype):
     try:
         meta = frappe.get_meta(doctype)
+        print("\nmeta\n",meta)
         existing = {f.fieldname for f in meta.fields}
         to_add = [f for f in _CUSTOM_FIELDS if f["fieldname"] not in existing]
         if not to_add:
