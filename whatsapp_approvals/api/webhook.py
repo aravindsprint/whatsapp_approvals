@@ -6,6 +6,10 @@ Meta WhatsApp Cloud API webhook.
   GET  → verify token challenge
   POST → receive button replies
 
+Webhook URL to configure in Meta Developer Console:
+  https://pranera.erpnext.com/api/wa-webhook
+  (or fallback: /api/method/whatsapp_approvals.api.webhook.handle)
+
 On APPROVE
   1. Update WhatsApp Approval Log  → Approved
   2. Set wa_approval_status = "Approved" on the document (so before_submit passes)
@@ -28,12 +32,19 @@ from whatsapp_approvals.utils.whatsapp import send_text_message, mark_as_read
 
 
 @frappe.whitelist(allow_guest=True)
-def handle():
+def handle(*args, **kwargs):
+    """
+    Single entry point for both GET (verification) and POST (messages).
+    Frappe routes both via website_route_rules pointing here.
+    """
     method = frappe.local.request.method
+
     if method == "GET":
         return _verify()
+
     if method == "POST":
         return _receive()
+
     frappe.local.response.http_status_code = 405
     return "Method Not Allowed"
 
@@ -52,11 +63,12 @@ def _verify():
         frappe.local.response.http_status_code = 400
         return "Bad Request"
 
-    expected = frappe.get_single("WhatsApp Approval Settings").webhook_verify_token
-    if token != expected:
+    expected = frappe.db.get_single_value("WhatsApp Approval Settings", "webhook_verify_token")
+    if not expected or token != expected:
         frappe.local.response.http_status_code = 403
         return "Forbidden"
 
+    # Return just the challenge string — Meta expects plain text
     frappe.local.response["type"]   = "text"
     frappe.local.response["result"] = challenge
     return challenge
@@ -77,7 +89,10 @@ def _receive():
     try:
         _process(payload)
     except Exception:
-        frappe.log_error(title="WA Webhook processing error", message=frappe.get_traceback())
+        frappe.log_error(
+            title="WA Webhook processing error",
+            message=frappe.get_traceback(),
+        )
 
     frappe.local.response.http_status_code = 200
     return "OK"
@@ -109,7 +124,10 @@ def _handle_button(msg, value):
     # Button ID format:  ACTION|DOCTYPE|DOCNAME
     parts = button_id.split("|", 2)
     if len(parts) != 3:
-        frappe.log_error(title="WA Webhook: unexpected button_id", message=button_id)
+        frappe.log_error(
+            title="WA Webhook: unexpected button_id",
+            message=button_id,
+        )
         return
 
     action, doctype, docname = parts
@@ -134,9 +152,12 @@ def _handle_button(msg, value):
         return
 
     # Fetch settings for approver display name
-    settings     = frappe.get_single("WhatsApp Approval Settings")
+    settings = frappe.get_single("WhatsApp Approval Settings")
     approver_display = (
-        settings.approver_phone_display or settings.approver_name or from_phone or "Approver"
+        getattr(settings, "approver_phone_display", None)
+        or getattr(settings, "approver_name", None)
+        or from_phone
+        or "Approver"
     )
 
     # Find the most recent pending log
@@ -196,7 +217,7 @@ def _handle_button(msg, value):
         _add_rejection_comment(doctype, docname, approver_display)
 
     # ── 4. Confirmation WA back to approver ──────────────────────────────────
-    if settings.send_confirmation_to_approver:
+    if getattr(settings, "send_confirmation_to_approver", False):
         emoji = "✅" if action == "APPROVE" else "❌"
         send_text_message(
             from_phone or settings.approver_phone,
@@ -205,10 +226,12 @@ def _handle_button(msg, value):
         )
 
     # ── 5. Bell notification for document owner ───────────────────────────────
-    if settings.send_notification_to_creator:
+    if getattr(settings, "send_notification_to_creator", False):
         _notify_owner(doctype, docname, new_status, approver_display)
 
-    frappe.logger().info(f"WA Approval: {doctype} {docname} → {new_status} by {from_phone}")
+    frappe.logger().info(
+        f"WA Approval: {doctype} {docname} → {new_status} by {from_phone}"
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -227,7 +250,7 @@ def _auto_submit(doctype, docname, approver):
         if doc.docstatus == 1:
             # Already submitted (race condition / duplicate webhook delivery)
             frappe.logger().info(
-                f"WA Approval: {doctype} {docname} already submitted — skipping auto-submit."
+                f"WA Approval: {doctype} {docname} already submitted — skipping."
             )
             return
 
