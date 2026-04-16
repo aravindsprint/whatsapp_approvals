@@ -1,5 +1,6 @@
+import frappe
 from frappe.model.document import Document
 
 
-class WaApprovalRuleField(Document):
+class WAApprovalRuleField(Document):
     pass
