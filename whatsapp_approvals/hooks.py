@@ -35,10 +35,6 @@ app_license = "mit"
 # include custom scss in every website theme (without file extension ".scss")
 # website_theme_scss = "whatsapp_approvals/public/scss/website"
 
-# include js, css files in header of web form
-# webform_include_js = {"doctype": "public/js/doctype.js"}
-# webform_include_css = {"doctype": "public/css/doctype.css"}
-
 # include js in page
 # page_js = {"page" : "public/js/file.js"}
 
@@ -93,30 +89,20 @@ app_license = "mit"
 
 # Integration Setup
 # ------------------
-# To set up dependencies/integrations with other apps
-# Name of the app being installed is passed as an argument
-
 # before_app_install = "whatsapp_approvals.utils.before_app_install"
 # after_app_install = "whatsapp_approvals.utils.after_app_install"
 
 # Integration Cleanup
 # -------------------
-# To clean up dependencies/integrations with other apps
-# Name of the app being uninstalled is passed as an argument
-
 # before_app_uninstall = "whatsapp_approvals.utils.before_app_uninstall"
 # after_app_uninstall = "whatsapp_approvals.utils.after_app_uninstall"
 
 # Desk Notifications
 # ------------------
-# See frappe.core.notifications.get_notification_config
-
 # notification_config = "whatsapp_approvals.notifications.get_notification_config"
 
 # Permissions
 # -----------
-# Permissions evaluated in scripted ways
-
 # permission_query_conditions = {
 # 	"Event": "frappe.desk.doctype.event.event.get_permission_query_conditions",
 # }
@@ -127,23 +113,25 @@ app_license = "mit"
 
 # DocType Class
 # ---------------
-# Override standard doctype classes
-
 # override_doctype_class = {
 # 	"ToDo": "custom_app.overrides.CustomToDo"
 # }
 
 # Document Events
 # ---------------
-# Hook on document methods and events
+# Wire the engine into every DocType using the "*" wildcard.
+# engine.dispatch() reads the WA Approval Rule for the DocType + event,
+# checks the condition, resolves the approver phone, and sends the message.
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+doc_events = {
+    "*": {
+        "on_save":                "whatsapp_approvals.engine.dispatch",
+        "before_submit":          "whatsapp_approvals.engine.dispatch",
+        "on_submit":              "whatsapp_approvals.engine.dispatch",
+        "on_update_after_submit": "whatsapp_approvals.engine.dispatch",
+        "on_cancel":              "whatsapp_approvals.engine.on_cancel",
+    }
+}
 
 # Scheduled Tasks
 # ---------------
@@ -178,20 +166,15 @@ app_license = "mit"
 # 	"frappe.desk.doctype.event.event.get_events": "whatsapp_approvals.event.get_events"
 # }
 #
-# each overriding function accepts a `data` argument;
-# generated from the base implementation of the doctype dashboard,
-# along with any modifications made in other Frappe apps
 # override_doctype_dashboards = {
 # 	"Task": "whatsapp_approvals.task.get_dashboard_data"
 # }
 
 # exempt linked doctypes from being automatically cancelled
-#
 # auto_cancel_exempted_doctypes = ["Auto Repeat"]
 
 # Ignore links to specified DocTypes when deleting documents
 # -----------------------------------------------------------
-
 # ignore_links_on_delete = ["Communication", "ToDo"]
 
 # Request Events
@@ -214,18 +197,6 @@ app_license = "mit"
 # 		"redact_fields": ["{field_1}", "{field_2}"],
 # 		"partial": 1,
 # 	},
-# 	{
-# 		"doctype": "{doctype_2}",
-# 		"filter_by": "{filter_by}",
-# 		"partial": 1,
-# 	},
-# 	{
-# 		"doctype": "{doctype_3}",
-# 		"strict": False,
-# 	},
-# 	{
-# 		"doctype": "{doctype_4}"
-# 	}
 # ]
 
 # Authentication and authorization
@@ -235,10 +206,8 @@ app_license = "mit"
 # 	"whatsapp_approvals.auth.validate"
 # ]
 
-# Automatically update python controller files with type annotations for this app.
 # export_python_type_annotations = True
 
 # default_log_clearing_doctypes = {
 # 	"Logging DocType Name": 30  # days to retain logs
 # }
-
