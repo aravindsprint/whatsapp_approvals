@@ -4,7 +4,7 @@ from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
 _CUSTOM_FIELDS = [
     {"fieldname":"wa_approval_section","fieldtype":"Section Break",
-     "label":"WhatsApp Approval","insert_after":"amended_from","collapsible":1},
+     "label":"WhatsApp Approvals","insert_after":"amended_from","collapsible":1},
     {"fieldname":"wa_approval_status","fieldtype":"Select",
      "label":"WA Approval Status","options":"\nPending\nApproved\nRejected",
      "insert_after":"wa_approval_section","read_only":1,"in_list_view":1,"bold":1},
