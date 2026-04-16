@@ -18,10 +18,9 @@ before_submit
       doc.submit() programmatically.
     • Webhook on Reject   → adds a comment, sets wa_approval_status = "Rejected".
 
-on_save
-    For the Frappe Workflow pattern.
-    Fires when a document is saved. Typically used with a condition such as
-    doc.workflow_state == "Pending Approval".
+on_save (stored as trigger_event on the rule)
+    Frappe fires "on_update" after every doc save; we map that back to "on_save"
+    so existing WA Approval Rules with trigger_event = "on_save" keep working.
     Does NOT block — just sends the WA message once (deduped by Pending log).
 
 on_submit
@@ -47,9 +46,15 @@ _SKIP_DOCTYPES = {
     "WhatsApp Approval Settings",
 }
 
+# Maps Frappe's internal event name (what hooks.py registers) →
+# the trigger_event value stored on WA Approval Rule records.
+#
+# KEY POINT: Frappe calls "on_update" after every save, never "on_save".
+# We map "on_update" → looks up rules with trigger_event = "on_save"
+# so existing rules created with "on_save" continue to work unchanged.
 _EVENT_MAP = {
     "before_submit":          "before_submit",
-    "on_save":                "on_save",
+    "on_update":              "on_save",        # Frappe save → our "on_save" rules
     "on_submit":              "on_submit",
     "on_update_after_submit": "on_update_after_submit",
 }
@@ -80,7 +85,7 @@ def dispatch(doc, method=None):
     for rule in rules:
         try:
             # ── Dedup: don't re-send if a Pending log already exists ──────────
-            # This prevents spamming the approver on every save.
+            # Prevents spamming the approver on every save.
             already_pending = frappe.db.exists(
                 "WhatsApp Approval Log",
                 {
@@ -95,7 +100,6 @@ def dispatch(doc, method=None):
             _fire_rule(doc, rule, blocking=False)
 
         except Exception:
-            # Use positional arg for frappe.log_error to avoid column issues
             frappe.log_error(frappe.get_traceback())
 
 
@@ -130,22 +134,15 @@ def on_cancel(doc, method=None):
 def _handle_before_submit(doc):
     rules = _get_rules(doc.doctype, "before_submit")
     if not rules:
-        return  # No rule for this DocType → submit normally
+        return
 
-    # ── Gate already cleared by the webhook ──────────────────────────────────
     if doc.get("wa_approval_status") == "Approved":
-        return  # Webhook already approved → let submission through
+        return
 
-    # ── Evaluate conditions — if ALL rules fail their condition, don't block ─
-    applicable_rules = []
-    for rule in rules:
-        if _condition_passes(doc, rule):
-            applicable_rules.append(rule)
-
+    applicable_rules = [r for r in rules if _condition_passes(doc, r)]
     if not applicable_rules:
-        return  # No rule's condition is met → submit normally
+        return
 
-    # ── Check if a pending log already exists (avoid duplicate WA sends) ─────
     existing_pending = frappe.db.exists(
         "WhatsApp Approval Log",
         {
@@ -156,30 +153,24 @@ def _handle_before_submit(doc):
     )
 
     if not existing_pending:
-        # Send WA message for each applicable rule
         for rule in applicable_rules:
             try:
                 _fire_rule(doc, rule, blocking=True)
             except Exception:
                 frappe.log_error(frappe.get_traceback())
 
-        # ── CRITICAL: commit the log BEFORE throwing ─────────────────────────
-        # frappe.throw() triggers a DB rollback.  We commit here so the log
-        # row persists in the DB — otherwise the webhook has nothing to look up.
+        # Commit BEFORE throw — frappe.throw() rolls back the transaction.
+        # Without this commit the log insert would be lost.
         frappe.db.commit()
 
-    # ── Block the submission ──────────────────────────────────────────────────
-    if existing_pending:
-        msg = (
-            f"A WhatsApp approval request is already pending for "
-            f"<b>{doc.doctype} {doc.name}</b>. "
-            "The document will be submitted automatically once the approver responds."
-        )
-    else:
-        msg = (
-            f"WhatsApp approval request sent for <b>{doc.doctype} {doc.name}</b>. "
-            "The document will be submitted automatically once the approver taps ✅ Approve."
-        )
+    msg = (
+        f"A WhatsApp approval request is already pending for "
+        f"<b>{doc.doctype} {doc.name}</b>. "
+        "The document will be submitted automatically once the approver responds."
+        if existing_pending else
+        f"WhatsApp approval request sent for <b>{doc.doctype} {doc.name}</b>. "
+        "The document will be submitted automatically once the approver taps ✅ Approve."
+    )
 
     frappe.throw(msg, title="Pending WhatsApp Approval", exc=frappe.ValidationError)
 
@@ -222,7 +213,6 @@ def _condition_passes(doc, rule):
 def _fire_rule(doc, rule, blocking=False):
     """Evaluate condition (if not already done), resolve phone, send message."""
     if not blocking:
-        # For non-before_submit triggers we still evaluate condition here
         if not _condition_passes(doc, rule):
             return
 
@@ -230,7 +220,7 @@ def _fire_rule(doc, rule, blocking=False):
     if not phone:
         rule_name = rule.get("name") if isinstance(rule, dict) else rule.name
         frappe.log_error(
-            f"WA Approval: approver phone not resolved. Rule: {rule_name} | Doc: {doc.doctype} {doc.name}",
+            f"WA Approval: phone not resolved. Rule: {rule_name} | Doc: {doc.doctype} {doc.name}",
         )
         return
 
