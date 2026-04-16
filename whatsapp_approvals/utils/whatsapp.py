@@ -109,7 +109,11 @@ def _build_body(doc, rule_doc):
         value = _format_value(doc, row)
         lines.append(f"*{label}:* {value}")
     lines.append("\n_Please review and tap a button below._")
-    return "\n".join(lines)
+    body = "\n".join(lines)
+    # WhatsApp interactive body hard limit is 1024 chars
+    if len(body) > 1020:
+        body = body[:1020] + "…"
+    return body
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -119,7 +123,9 @@ def _build_body(doc, rule_doc):
 def send_approval_message(doc, rule_doc, phone):
     """
     Build and send the interactive button message.
-    Creates a WhatsApp Approval Log. Returns the log name.
+    Creates a WhatsApp Approval Log and commits immediately so the log
+    is never rolled back even if something fails later in the same request.
+    Returns the log name.
 
     Button ID format:  ACTION|DOCTYPE|DOCNAME
     """
@@ -165,9 +171,22 @@ def send_approval_message(doc, rule_doc, phone):
     })
     log.insert(ignore_permissions=True)
 
+    # ── CRITICAL: commit immediately ──────────────────────────────────────────
+    # The on_save hook runs inside Frappe's document save transaction.
+    # Without an explicit commit here, if anything fails later in that
+    # transaction the log insert (and the already-sent WA message record)
+    # would be silently rolled back, making it look like nothing happened.
+    frappe.db.commit()
+
     if error:
-        frappe.log_error(title=f"WA send failed: {doc.doctype} {doc.name}", message=error)
-        frappe.msgprint(_(f"WhatsApp message could not be sent: {error}"), indicator="red", alert=True)
+        frappe.log_error(
+            f"WA send failed for {doc.doctype} {doc.name}: {error}",
+        )
+        frappe.msgprint(
+            _(f"WhatsApp message could not be sent: {error}"),
+            indicator="red",
+            alert=True,
+        )
     else:
         # Write wa_approval_status on the document if custom field exists
         meta = frappe.get_meta(doc.doctype)
@@ -192,7 +211,7 @@ def send_text_message(phone, text):
         "text":              {"preview_url": False, "body": text},
     })
     if error:
-        frappe.log_error(title="WA text send failed", message=error)
+        frappe.log_error(f"WA text send failed: {error}")
     return wamid
 
 

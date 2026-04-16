@@ -22,7 +22,7 @@ on_save
     For the Frappe Workflow pattern.
     Fires when a document is saved. Typically used with a condition such as
     doc.workflow_state == "Pending Approval".
-    Does NOT block — just sends the WA message.
+    Does NOT block — just sends the WA message once (deduped by Pending log).
 
 on_submit
     For Pattern 3: pure post-submit notification (not a real gate).
@@ -79,12 +79,24 @@ def dispatch(doc, method=None):
 
     for rule in rules:
         try:
-            _fire_rule(doc, rule, blocking=False)
-        except Exception:
-            frappe.log_error(
-                title=f"WA Approval: rule {rule.name} failed on {doc.doctype} {doc.name}",
-                message=frappe.get_traceback(),
+            # ── Dedup: don't re-send if a Pending log already exists ──────────
+            # This prevents spamming the approver on every save.
+            already_pending = frappe.db.exists(
+                "WhatsApp Approval Log",
+                {
+                    "reference_doctype": doc.doctype,
+                    "reference_name":    doc.name,
+                    "status":            "Pending",
+                },
             )
+            if already_pending:
+                continue
+
+            _fire_rule(doc, rule, blocking=False)
+
+        except Exception:
+            # Use positional arg for frappe.log_error to avoid column issues
+            frappe.log_error(frappe.get_traceback())
 
 
 def on_cancel(doc, method=None):
@@ -149,10 +161,7 @@ def _handle_before_submit(doc):
             try:
                 _fire_rule(doc, rule, blocking=True)
             except Exception:
-                frappe.log_error(
-                    title=f"WA Approval: send failed for {doc.doctype} {doc.name}",
-                    message=frappe.get_traceback(),
-                )
+                frappe.log_error(frappe.get_traceback())
 
         # ── CRITICAL: commit the log BEFORE throwing ─────────────────────────
         # frappe.throw() triggers a DB rollback.  We commit here so the log
@@ -196,7 +205,7 @@ def _get_rules(doctype, trigger):
 
 
 def _condition_passes(doc, rule):
-    condition = rule.get("condition") or (rule.condition if hasattr(rule, "condition") else "")
+    condition = rule.get("condition") if isinstance(rule, dict) else getattr(rule, "condition", "")
     if not condition or not condition.strip():
         return True
     try:
@@ -205,10 +214,8 @@ def _condition_passes(doc, rule):
             eval_globals={"doc": doc, "frappe": frappe},
         ))
     except Exception as exc:
-        frappe.log_error(
-            title=f"WA Approval: condition error in rule {rule.get('name') or rule.name}",
-            message=str(exc),
-        )
+        rule_name = rule.get("name") if isinstance(rule, dict) else rule.name
+        frappe.log_error(f"WA Approval condition error in rule {rule_name}: {exc}")
         return False
 
 
@@ -221,11 +228,12 @@ def _fire_rule(doc, rule, blocking=False):
 
     phone = resolve_approver_phone(rule, doc)
     if not phone:
+        rule_name = rule.get("name") if isinstance(rule, dict) else rule.name
         frappe.log_error(
-            title="WA Approval: approver phone not resolved",
-            message=f"Rule: {rule.get('name') or rule.name} | Doc: {doc.doctype} {doc.name}",
+            f"WA Approval: approver phone not resolved. Rule: {rule_name} | Doc: {doc.doctype} {doc.name}",
         )
         return
 
-    rule_doc = frappe.get_doc("WA Approval Rule", rule.get("name") or rule.name)
+    rule_name = rule.get("name") if isinstance(rule, dict) else rule.name
+    rule_doc  = frappe.get_doc("WA Approval Rule", rule_name)
     send_approval_message(doc, rule_doc, phone)
